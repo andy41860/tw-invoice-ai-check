@@ -1,0 +1,43 @@
+services:
+
+  # ---- API 推論服務 ----
+  api:
+    build: .
+    env_file: .env
+    ports:
+      - "${APP_PORT:-8000}:${APP_PORT:-8000}"
+    volumes:
+      # 掛載 model/ 讓權重可在容器外管理，修改版本無需重新 build
+      - ./model:/app/model
+    depends_on:
+      db:
+        # 等待 db 通過 healthcheck 後才啟動 api
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ---- PostgreSQL 對獎號碼資料庫 ----
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-invoice}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      # 對外曝露的 port（host 端存取用）；容器內固定 5432
+      - "${POSTGRES_EXTERNAL_PORT:-5432}:5432"
+    volumes:
+      # 資料持久化：named volume
+      - pgdata:/var/lib/postgresql/data
+      # 首次初始化時自動執行 init.sql（建表 + 載入對獎號碼）
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-invoice}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  # PostgreSQL 資料持久化 volume
+  pgdata:

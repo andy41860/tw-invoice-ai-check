@@ -1,0 +1,41 @@
+# ---- 環境變數（含敏感資訊，不進 git）----
+.env
+
+# ---- Python 快取 ----
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# ---- 虛擬環境 ----
+.venv/
+venv/
+env/
+
+# ---- uv 快取 ----
+.uv/
+uv.lock
+
+# ---- 測試輸出 ----
+debug_crops/
+invoice_ocr_results.csv
+
+# ---- IDE 設定 ----
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ---- PostgreSQL data volume（docker compose 掛載）----
+pgdata/
+
+# ---- 其他 ----
+*.log
+*.tmp
+dist/
+build/
+*.egg-info/
+
+# 忽略所有叫 md 的子資料夾及其底下所有檔案
+md/
+**/md/

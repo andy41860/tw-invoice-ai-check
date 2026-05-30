@@ -1,0 +1,34 @@
+# ---- git 版控 ----
+.git
+.gitignore
+
+# ---- 虛擬環境（容器內自行安裝）----
+.venv
+venv
+env
+
+# ---- Python 快取 ----
+__pycache__
+*.py[cod]
+
+# ---- 環境變數（透過 env_file 注入，不打包進 image）----
+.env
+
+# ---- 本機測試輸出 ----
+debug_crops
+invoice_ocr_results.csv
+*.csv
+
+# ---- IDE 設定 ----
+.idea
+.vscode
+
+# ---- 文件（不影響執行）----
+md/
+
+# ---- PostgreSQL data volume ----
+pgdata/
+
+# 忽略所有叫 md 的子資料夾及其底下所有檔案
+md/
+**/md/

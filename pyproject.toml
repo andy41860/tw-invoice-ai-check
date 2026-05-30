@@ -1,0 +1,40 @@
+[project]
+name = "invoice-ocr-fastapi"
+version = "1.0.0"
+description = "台灣電子發票 YOLO+OCR 對獎 FastAPI 推論服務"
+requires-python = ">=3.11"
+
+dependencies = [
+    # Web 框架
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    # 資料驗證
+    "pydantic>=2.7.0",
+    "pydantic-settings>=2.3.0",
+    # 上傳檔案支援
+    "python-multipart>=0.0.9",
+    # PostgreSQL 驅動（psycopg v3）
+    "psycopg[binary]>=3.1.0",
+    "psycopg-pool>=3.2.0",
+    # YOLO 推論（batch_invoice_ocr.py 使用）
+    "ultralytics>=8.2.0",
+    # OCR（batch_invoice_ocr.py 使用）
+    "easyocr>=1.7.0",
+    # 影像處理（batch_invoice_ocr.py 使用，headless 避免 GUI 依賴）
+    "opencv-python-headless>=4.10.0",
+    # 數值計算（batch_invoice_ocr.py 使用）
+    "numpy>=1.26.0",
+    # 資料處理（batch_invoice_ocr.py 使用）
+    "pandas>=2.2.0",
+    # 進度條（batch_invoice_ocr.py 使用）
+    "tqdm>=4.66.0",
+    # HTTP 客戶端（測試腳本呼叫 API 使用）
+    "requests>=2.32.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+dev-dependencies = []
