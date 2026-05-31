@@ -411,8 +411,6 @@ def EasyocrTextBest(
     ocrReader,
     crop,
     fieldName: str = None,
-    saveDebugDir=None,
-    imageStem: str = None,
 ) -> str:
     """
     產生多種 OpenCV 前處理版本，逐一 OCR，挑出最符合欄位格式的結果。
@@ -421,8 +419,6 @@ def EasyocrTextBest(
         ocrReader: EasyOCR Reader 實例。
         crop: 從 YOLO bbox 裁切出的圖片區塊（BGR ndarray）。
         fieldName: 欄位名稱，用於選擇 allowlist 與評分規則。
-        saveDebugDir: debug 輸出目錄（None 表示不輸出）。
-        imageStem: 圖片 stem（debug 用途）。
 
     Returns:
         最高分的 OCR 結果字串（已經過 NormalizeText 後處理）。
@@ -434,12 +430,6 @@ def EasyocrTextBest(
     bestVariantName = ""
 
     for variantName, variantImg in variants:
-
-        # 若指定 debug 目錄則儲存前處理圖片
-        if saveDebugDir is not None and imageStem is not None:
-            saveDebugDir.mkdir(parents=True, exist_ok=True)
-            debugName = f"{imageStem}_{fieldName}_{variantName}.jpg"
-            cv2.imwrite(str(saveDebugDir / debugName), variantImg)
 
         try:
             result = EasyocrReadByField(

@@ -172,8 +172,6 @@ def AnalyzeImage(
             ocrReader=ocrReader,
             crop=crop,
             fieldName=fieldName,
-            saveDebugDir=None,
-            imageStem=None,
         )
 
         fields[fieldName] = bestText

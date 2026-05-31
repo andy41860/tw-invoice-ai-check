@@ -33,8 +33,6 @@ class Settings(BaseSettings):
     ModelVersion: str = "v1.0"
     # 權重檔名
     ModelWeightName: str = "best.pt"
-    # 推論裝置，固定 cpu
-    Device: str = "cpu"
     # YOLO confidence threshold
     YoloConf: float = 0.25
     # YOLO 推論圖片尺寸
@@ -51,9 +49,6 @@ class Settings(BaseSettings):
     PostgresUser: str = "postgres"
     # 資料庫密碼
     PostgresPassword: str = "postgres"
-    # 對 host 曝露的 DB port（host:container = <外部port>:5432）
-    PostgresExternalPort: int = 5432
-
     @property
     def ModelWeightPath(self) -> Path:
         """組合 YOLO 權重完整路徑：model/<ModelVersion>/<ModelWeightName>"""
