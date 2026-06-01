@@ -95,6 +95,9 @@ CREATE TABLE IF NOT EXISTS invoice_awards (
 CREATE TABLE IF NOT EXISTS invoice_inference_results (
     id SERIAL PRIMARY KEY,
 
+    -- 請求追蹤 ID，同一次推論與 invoice_inference_conf 共用相同值
+    request_id UUID NOT NULL,
+
     -- 影像與模型資訊
     image_name TEXT NOT NULL,
     model_version TEXT,
@@ -130,6 +133,9 @@ CREATE TABLE IF NOT EXISTS invoice_inference_results (
     )
 );
 
+CREATE INDEX IF NOT EXISTS idx_invoice_inference_results_request_id
+ON invoice_inference_results (request_id);
+
 CREATE INDEX IF NOT EXISTS idx_invoice_inference_results_invoice_number
 ON invoice_inference_results (invoice_number);
 
@@ -148,14 +154,14 @@ ON invoice_inference_results (insert_time);
 CREATE TABLE IF NOT EXISTS invoice_inference_conf (
     id SERIAL PRIMARY KEY,
 
+    -- 請求追蹤 ID，與 invoice_inference_results.request_id 相同，用於追蹤同一次推論
+    request_id UUID NOT NULL,
+
     -- 對應到推論結果
     inference_result_id INTEGER NOT NULL REFERENCES invoice_inference_results(id) ON DELETE CASCADE,
 
     -- 影像檔名
     image_name TEXT NOT NULL,
-
-    -- 發票號碼
-    invoice_number TEXT,
 
     -- 欄位名稱，例如 invoice_number, invoice_date, invoice_time, total_amount, merchant_name
     field_name TEXT NOT NULL,
@@ -177,6 +183,9 @@ CREATE TABLE IF NOT EXISTS invoice_inference_conf (
         confidence IS NULL OR (confidence >= 0 AND confidence <= 1)
     )
 );
+
+CREATE INDEX IF NOT EXISTS idx_invoice_inference_conf_request_id
+ON invoice_inference_conf (request_id);
 
 CREATE INDEX IF NOT EXISTS idx_invoice_inference_conf_result_id
 ON invoice_inference_conf (inference_result_id);

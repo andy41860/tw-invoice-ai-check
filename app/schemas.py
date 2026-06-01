@@ -99,5 +99,7 @@ class InvoiceAnalyzeResponse(BaseModel):
 
     # API 是否成功完成推論流程
     success: bool
-    # 推論結果（success=False 時仍盡量填入 data）
+    # 本次請求唯一識別碼，用於追蹤推論與 DB 寫入記錄
+    request_id: str
+    # 推論結果（success=False 時為 None）
     data: Optional[InvoiceAnalyzeData] = None
