@@ -286,3 +286,43 @@ DO UPDATE SET
     source = EXCLUDED.source;
 
 
+-- =========================================================
+-- 6. Create table: invoice_batch_inference_logs
+--    由 Go batch 服務記錄每張圖片的處理結果
+-- =========================================================
+
+CREATE TABLE IF NOT EXISTS invoice_batch_inference_logs (
+    id SERIAL PRIMARY KEY,
+
+    -- 請求追蹤 ID（成功時與 invoice_inference_results.request_id 相同；失敗時可為 NULL）
+    request_id UUID,
+
+    -- 影像資訊
+    image_name TEXT NOT NULL,
+    image_path TEXT,
+
+    -- 處理狀態
+    status TEXT NOT NULL,
+    error_message TEXT,
+
+    -- 效能指標
+    inference_time_ms INTEGER,
+
+    -- 模型版本
+    model_version TEXT,
+
+    -- 寫入時間（Taipei 時間）
+    insert_time TIMESTAMP DEFAULT (NOW() AT TIME ZONE 'Asia/Taipei'),
+
+    -- status 只允許兩個值
+    CONSTRAINT chk_batch_status CHECK (status IN ('success', 'failed'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_batch_inference_logs_request_id
+ON invoice_batch_inference_logs (request_id);
+
+CREATE INDEX IF NOT EXISTS idx_batch_inference_logs_status
+ON invoice_batch_inference_logs (status);
+
+CREATE INDEX IF NOT EXISTS idx_batch_inference_logs_insert_time
+ON invoice_batch_inference_logs (insert_time);

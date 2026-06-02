@@ -12,6 +12,7 @@ OCR 核心邏輯定義於 app/ocr.py。
   (b) 額外回傳每個欄位的 YOLO confidence，供 yolo_confidence 欄位使用。
 """
 
+import threading
 from typing import Any, Dict, Optional
 
 import easyocr
@@ -71,6 +72,8 @@ def LoadModels(settings: Settings) -> Dict[str, Any]:
             "en": ocrEn,
             "zh": ocrZh,
         },
+        # 保護 yoloModel.predict() 避免多 thread 同時進入造成 fuse race condition
+        "yolo_lock": threading.Lock(),
     }
 
 
@@ -80,6 +83,7 @@ def AnalyzeImage(
     ocrReaders: Dict[str, Any],
     conf: float,
     imgsz: int,
+    yoloLock: threading.Lock = None,
 ) -> Optional[Dict[str, Any]]:
     """
     對單張發票圖片執行 YOLO 偵測 + EasyOCR 辨識，回傳欄位結果與信心值。
@@ -110,14 +114,26 @@ def AnalyzeImage(
     confidence: Dict[str, Optional[float]] = {fieldName: None for fieldName in CLASS_MAP.values()}
 
     # Step 1：YOLO 推論（device=cpu）
+    # 用 Lock 確保同一時間只有一個 thread 進入 predict()，
+    # 防止 Ultralytics 首次 predict 的 lazy fuse 在多執行緒下發生 race condition。
     try:
-        results = yoloModel.predict(
-            source=imageBgr,
-            device="cpu",
-            conf=conf,
-            imgsz=imgsz,
-            verbose=False,
-        )
+        if yoloLock is not None:
+            with yoloLock:
+                results = yoloModel.predict(
+                    source=imageBgr,
+                    device="cpu",
+                    conf=conf,
+                    imgsz=imgsz,
+                    verbose=False,
+                )
+        else:
+            results = yoloModel.predict(
+                source=imageBgr,
+                device="cpu",
+                conf=conf,
+                imgsz=imgsz,
+                verbose=False,
+            )
     except Exception as inferenceError:
         print(f"[Inference][WARN] YOLO 推論失敗：{inferenceError}")
         return None

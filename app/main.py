@@ -16,12 +16,14 @@ import uuid
 from contextlib import asynccontextmanager
 from typing import Any, Dict
 
+import numpy as np
+
 import psycopg
 from fastapi import Depends, FastAPI, File, UploadFile, status
 from fastapi.responses import JSONResponse
 
 from app.config import GetSettings, Settings
-from app.db import CreatePool, InsertInferenceConf, InsertInferenceResult
+from app.db import CreatePool
 from app.dependencies import get_db, get_models, get_settings
 from app.inference import AnalyzeImage, LoadModels
 from app.prize import CheckInvoiceAward
@@ -52,6 +54,20 @@ async def lifespan(app: FastAPI):
     print("[Lifespan] 服務啟動，載入模型中 ...")
     app.state.models = LoadModels(settings)
     print("[Lifespan] 模型載入完成。")
+
+    # ---- 啟動：YOLO warmup predict（觸發 lazy fuse，單執行緒完成初始化）----
+    # Ultralytics 第一次 predict() 會執行 model.fuse()，移除 Conv 的 bn 屬性。
+    # 在 lifespan 單執行緒階段先跑一次，避免多 thread 同時觸發 fuse 的 race condition。
+    print("[Lifespan] 執行 YOLO warmup predict ...")
+    dummyImage = np.zeros((640, 640, 3), dtype=np.uint8)
+    app.state.models["yolo"].predict(
+        source=dummyImage,
+        device="cpu",
+        conf=settings.YoloConf,
+        imgsz=settings.YoloImgsz,
+        verbose=False,
+    )
+    print("[Lifespan] YOLO warmup 完成。")
 
     # ---- 啟動：建立 DB 連線池 ----
     print("[Lifespan] 建立 PostgreSQL 連線池 ...")
@@ -104,8 +120,9 @@ def AnalyzeInvoice(
     3. 呼叫 inference.AnalyzeImage（封裝既有 YOLO+OCR 機制）。
     4. 將 OCR 字串轉換為 Pydantic 型別（date / time / int）。
     5. 呼叫 prize.CheckInvoiceAward 對獎。
-    6. 將推論結果與 confidence 寫入 DB（帶入同一個 request_id）。
-    7. 組裝 InvoiceAnalyzeResponse 回傳（含 request_id）。
+    6. 組裝 InvoiceAnalyzeResponse 回傳（含 request_id）。
+
+    DB 寫入由 Go batch 服務負責，FastAPI 不寫入 invoice_inference_results / invoice_inference_conf。
 
     OCR 失敗或欄位解析失敗不回傳 500，以 success=True 但欄位為 null 表達。
     圖片無法讀取（非合法圖片格式）回傳 HTTP 400。
@@ -136,6 +153,7 @@ def AnalyzeInvoice(
         ocrReaders=models["ocrReaders"],
         conf=settings.YoloConf,
         imgsz=settings.YoloImgsz,
+        yoloLock=models["yolo_lock"],
     )
 
     if inferResult is None:
@@ -185,39 +203,7 @@ def AnalyzeInvoice(
         conn=conn,
     )
 
-    # ---- Step 6：寫入 DB（同一個 request_id 用於兩張表）----
-    inferenceResultId = InsertInferenceResult(
-        conn=conn,
-        requestId=requestId,
-        imageName=imageName,
-        modelVersion=settings.ModelVersion,
-        invoiceNumber=parsedInvoiceNumber,
-        invoiceDate=parsedInvoiceDate,
-        invoiceTime=parsedInvoiceTime,
-        totalAmount=parsedTotalAmount,
-        merchantName=parsedMerchantName,
-        awardPeriod=awardResult.period,
-        isWinning=awardResult.is_winning,
-        prizeType=awardResult.prize_type,
-        prizeAmount=awardResult.prize_amount,
-        matchedNumber=awardResult.matched_number,
-    )
-
-    InsertInferenceConf(
-        conn=conn,
-        requestId=requestId,
-        inferenceResultId=inferenceResultId,
-        imageName=imageName,
-        confidenceFields=[
-            ("invoice_number", ocrConf.get("invoice_number")),
-            ("invoice_date", ocrConf.get("invoice_date")),
-            ("invoice_time", ocrConf.get("invoice_time")),
-            ("total_amount", ocrConf.get("total_amount")),
-            ("merchant_name", ocrConf.get("merchant_name")),
-        ],
-    )
-
-    # ---- Step 7：組裝回應 ----
+    # ---- Step 6：組裝回應 ----
     analyzeData = InvoiceAnalyzeData(
         image_name=imageName,
         model_version=settings.ModelVersion,

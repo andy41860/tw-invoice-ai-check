@@ -12,14 +12,18 @@
 ├── .env.example              # 環境變數範本
 ├── .gitignore
 ├── .dockerignore
-├── docker-compose.yml        # api + db 兩個服務
-├── Dockerfile                # 以 uv 安裝、跑 uvicorn
+├── docker-compose.yml        # api + db + batch 三個服務
+├── Dockerfile                # FastAPI：以 uv 安裝、跑 uvicorn
 ├── pyproject.toml            # uv 套件管理
 ├── batch_invoice_ocr.py      # 既有 OCR 核心（不可修改）
-├── init.sql                  # 對獎號碼建表 + 初始資料
+├── init.sql                  # 對獎號碼建表 + 初始資料 + batch log table
 ├── model/
 │   └── v1.0/
 │       └── best.pt           # YOLO 權重（需手動放置，不進 git）
+├── go_batch/                 # Go batch 批次推論服務
+│   ├── Dockerfile            # multi-stage Go build
+│   ├── go.mod
+│   └── main.go
 └── app/
     ├── main.py               # FastAPI app + lifespan
     ├── config.py             # pydantic-settings 設定
@@ -178,6 +182,59 @@ docker compose restart api
 ```
 
 回傳的 `model_version` 欄位會自動對應。
+
+---
+
+## Go Batch 批次推論服務
+
+`go_batch/` 是 Go 語言實作的批次推論服務，負責掃描指定目錄中的圖片，呼叫 FastAPI `/analyze` 推論後，將結果寫入 PostgreSQL。
+
+### 服務職責分工
+
+| 服務 | 職責 |
+|---|---|
+| FastAPI (`api`) | 單張圖片推論、OCR、對獎判斷，回傳 JSON |
+| Go batch (`batch`) | 掃描資料夾、並行呼叫 FastAPI、寫入 DB |
+| PostgreSQL (`db`) | 保存推論結果、confidence、批次 log |
+
+### 使用方式
+
+```bash
+# 啟動 DB 與 FastAPI
+docker compose up --build -d db api
+
+# 執行一次 Go batch（處理完後容器自動結束）
+docker compose run --rm batch
+
+# 看 API log
+docker compose logs -f api
+
+# 查詢 batch 處理記錄
+docker compose exec db psql -U postgres -d invoice -c "SELECT * FROM invoice_batch_inference_logs ORDER BY id DESC LIMIT 20;"
+
+# 若 init.sql schema 有變更，需重建 DB volume
+docker compose down -v
+docker compose up --build -d db api
+```
+
+### Go Batch 環境變數
+
+| 變數 | 預設值 | 說明 |
+|---|---|---|
+| `BATCH_API_URL` | `http://api:8000` | FastAPI 服務 URL（容器內使用服務名） |
+| `BATCH_INPUT_DIR` | `./test_samples` | Host 端圖片目錄（掛載到容器） |
+| `CONTAINER_BATCH_INPUT_DIR` | `/data/test_samples` | 容器內的掛載路徑 |
+| `BATCH_WORKERS` | `2` | 並行 worker 數量 |
+
+### DB 寫入說明
+
+批次推論成功後，Go 服務會寫入三張表：
+
+1. `invoice_inference_results`：OCR 辨識結果與對獎結果
+2. `invoice_inference_conf`：各欄位 YOLO confidence
+3. `invoice_batch_inference_logs`：處理日誌（成功或失敗均記錄）
+
+失敗的圖片（API 錯誤、逾時、DB 寫入失敗等）只寫 `invoice_batch_inference_logs(status='failed')`，不影響其他圖片繼續執行。
 
 ---
 

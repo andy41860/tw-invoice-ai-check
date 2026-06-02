@@ -4,6 +4,10 @@ services:
   api:
     build: .
     env_file: .env
+    environment:
+      TZ: Asia/Taipei
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
     ports:
       - "${APP_PORT:-8000}:${APP_PORT:-8000}"
     volumes:
@@ -13,12 +17,21 @@ services:
       db:
         # 等待 db 通過 healthcheck 後才啟動 api
         condition: service_healthy
+    healthcheck:
+      # /health 在 lifespan 完成（含 warmup）後才會回應，確認模型已完全就緒
+      test: ["CMD-SHELL", "curl -f http://localhost:${APP_PORT:-8000}/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 180s
     restart: unless-stopped
 
   # ---- PostgreSQL 對獎號碼資料庫 ----
   db:
     image: postgres:16
     environment:
+      TZ: Asia/Taipei
+      PGTZ: Asia/Taipei
       POSTGRES_DB: ${POSTGRES_DB:-invoice}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
@@ -37,6 +50,27 @@ services:
       retries: 10
       start_period: 10s
     restart: unless-stopped
+
+  # ---- Go batch 批次推論服務（執行一次即結束，不常駐）----
+  batch:
+    build:
+      context: ./go_batch
+      dockerfile: Dockerfile
+    environment:
+      TZ: Asia/Taipei
+      API_URL: ${BATCH_API_URL:-http://api:8000}
+      INPUT_DIR: ${CONTAINER_BATCH_INPUT_DIR:-/data/test_samples}
+      WORKERS: ${BATCH_WORKERS:-2}
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-invoice}?sslmode=disable
+    volumes:
+      # 將 host 端圖片目錄掛載至容器，唯讀
+      - ${BATCH_INPUT_DIR:-./test_samples}:${CONTAINER_BATCH_INPUT_DIR:-/data/test_samples}:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    restart: "no"
 
 volumes:
   # PostgreSQL 資料持久化 volume
