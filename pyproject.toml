@@ -1,5 +1,5 @@
 [project]
-name = "invoice-ocr-fastapi"
+name = "tw_invoice_ai_check"
 version = "1.0.0"
 description = "台灣電子發票 YOLO+OCR 對獎 FastAPI 推論服務"
 requires-python = ">=3.11"

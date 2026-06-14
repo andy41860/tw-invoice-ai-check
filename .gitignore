@@ -42,6 +42,13 @@ md/
 
 # 忽略 CLAUDE.md
 CLAUDE.md
+APP_ARCHITECTURE.md
 
 # 忽略api測試檔案
 test_inference.py
+
+# CSV files
+*.csv
+
+# Jupyter Notebook files
+*.ipynb

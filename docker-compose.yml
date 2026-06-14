@@ -1,3 +1,5 @@
+name: tw_invoice_ai_check
+
 services:
 
   # ---- API 推論服務 ----
