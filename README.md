@@ -48,7 +48,7 @@ model/v1.0/best.pt
 
 ### 2. 建立 `.env`
 
-複製.env.example範本並依實際環境填入。
+複製`.env.example`範本並依實際設定需求填入。
 
 
 ### 3. 啟動服務
@@ -70,8 +70,7 @@ docker compose run --rm batch
 | `APP_PORT` | FastAPI 對外服務 port | `8000` |
 | `MODEL_VERSION` | YOLO 權重版本，對應路徑 `model/<version>/` | `v1.0` |
 | `MODEL_WEIGHT_NAME` | YOLO 權重檔名 | `best.pt` |
-| `YOLO_CONF` | YOLO 偵測信心值門檻 | `0.25` |
-| `YOLO_IMGSZ` | YOLO 推論圖片尺寸 | `960` |
+| `YOLO_CONF` | YOLO 偵測信心值門檻 | `0.5` |
 | `POSTGRES_DB` | PostgreSQL 資料庫名稱 | `invoice` |
 | `POSTGRES_USER` | PostgreSQL 帳號 | `postgres` |
 | `POSTGRES_PASSWORD` | PostgreSQL 密碼 | *(請自行設定)* |
@@ -99,7 +98,6 @@ docker compose run --rm batch
 
 - **輸入**：`multipart/form-data`，欄位名稱為 `file`，支援 `jpg` / `png`
 - **DB 寫入**：FastAPI 不寫入 DB；結果由 Go batch 服務負責寫入
-- **錯誤處理**：圖片無法讀取回傳 `HTTP 400`, OCR 辨識失敗以欄位 `null` 表達，不回傳 `500`
 
 **回傳 JSON 範例（未中獎）：**
 
@@ -114,7 +112,7 @@ docker compose run --rm batch
       "invoice_number": "AB-12345678",
       "invoice_date": "2026-01-15",
       "invoice_time": "13:45:00",
-      "total_amount": 120,
+      "total_amount": 100,
       "merchant_name": "範例商家"
     },
     "yolo_confidence": {
