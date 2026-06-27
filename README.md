@@ -1,130 +1,127 @@
-# 發票 OCR 對獎服務
+# Taiwan Invoice AI System
 
-台灣電子發票證明聯 YOLO+OCR 辨識 + 統一發票對獎，以 FastAPI 包裝，支援 Docker Compose 一鍵啟動。
+本專案是一個紙本台灣電子發票證明聯 AI 自動辨識與對獎分析系統。專案使用 YOLO11 偵測發票關鍵欄位，結合 OpenCV 前處理與 OCR 擷取文字，解析發票號碼、日期、金額與商家資訊，並自動完成對獎。系統透過 FastAPI 封裝推論服務，使用 Go Batch 進行併發批次推論，並將結果寫入 PostgreSQL，最後以 Power BI 進行視覺化分析。
+
+*本專案部分程式碼與 Claude Code 協作開發。*
 
 ---
 
 ## 專案結構
 
-```
-專案根目錄/
-├── .env                      # 實際環境變數（不進 git）
-├── .env.example              # 環境變數範本
-├── .gitignore
-├── .dockerignore
-├── docker-compose.yml        # api + db + batch 三個服務
-├── Dockerfile                # FastAPI：以 uv 安裝、跑 uvicorn
-├── pyproject.toml            # uv 套件管理
-├── batch_invoice_ocr.py      # 既有 OCR 核心（不可修改）
-├── init.sql                  # 對獎號碼建表 + 初始資料 + batch log table
-├── model/
+```text
+tw-invoice-ai-check/
+├── app/                       # FastAPI 推論服務核心
+│   ├── main.py                # 路由定義與 lifespan 模型載入
+│   ├── config.py              # 環境變數設定
+│   ├── inference.py           # YOLO + EasyOCR 推論邏輯
+│   ├── ocr.py                 # OCR 文字後處理
+│   ├── prize.py               # 對獎判斷邏輯
+│   ├── schemas.py             # Pydantic 輸入/輸出 schema
+│   ├── db.py                  # PostgreSQL 連線池建立
+│   ├── dependencies.py        # FastAPI DI（模型、DB、設定注入）
+│   └── utils.py               # 工具函數（日期、金額解析等）
+├── go_batch/                  # Go 批次推論程式（非常駐，跑完即結束）
+│   ├── main.go                # 掃描圖片 → 呼叫 API → 寫入 PostgreSQL
+│   ├── go.mod                 # Go module 定義
+│   └── Dockerfile             # Go 容器建置
+├── model/                     # YOLO 權重目錄（不進 git）
 │   └── v1.0/
-│       └── best.pt           # YOLO 權重（需手動放置，不進 git）
-├── go_batch/                 # Go batch 批次推論服務
-│   ├── Dockerfile            # multi-stage Go build
-│   ├── go.mod
-│   └── main.go
-└── app/
-    ├── main.py               # FastAPI app + lifespan
-    ├── config.py             # pydantic-settings 設定
-    ├── schemas.py            # Pydantic 輸入/輸出模型
-    ├── dependencies.py       # DI：取得 models / DB 連線
-    ├── inference.py          # 封裝 YOLO+OCR（重用 batch_invoice_ocr.py）
-    ├── db.py                 # PostgreSQL 連線與查詢
-    ├── prize.py              # 對獎邏輯
-    └── utils.py              # 共用工具函數
+│       └── best.pt            # YOLO11 訓練權重
+├── test_samples/              # 測試用發票圖片
+├── docker-compose.yml         # 容器服務設定（api / db / batch）
+├── init.sql                   # PostgreSQL 初始化腳本（建表 + 載入對獎號碼）
+├── Dockerfile                 # FastAPI 容器建置
+└── README.md                  # 專案說明文件
 ```
 
 ---
 
-## 快速啟動
+## 使用方式
 
 ### 1. 放置 YOLO 權重
+
+將訓練好的權重檔放至：
 
 ```
 model/v1.0/best.pt
 ```
 
-> 若使用其他版本，修改 `.env` 的 `MODEL_VERSION=v1.1`，並放置 `model/v1.1/best.pt`，**不需要改程式碼**。
-
 ### 2. 建立 `.env`
 
-```bash
-cp .env.example .env
-# 視需要修改 POSTGRES_PASSWORD 等敏感資訊
-```
+複製.env.example範本並依實際環境填入。
 
-### 3. 一鍵啟動
+
+### 3. 啟動服務
 
 ```bash
-docker compose up --build -d
-```
+# 啟動 DB 與 FastAPI
+docker compose up --build -d db api
 
-啟動後：
-- API 服務：`http://localhost:8000`
-- API 文件：`http://localhost:8000/docs`
-- db 容器**首次啟動**時會自動執行 `init.sql`（建表 + 載入對獎號碼）
+# 執行一次 Go batch（處理完後容器自動結束）
+docker compose run --rm batch
+```
 
 ---
 
 ## 環境變數說明
 
-| 變數 | 預設值 | 說明 |
+| 變數名稱 | 用途 | 預設值 |
 |---|---|---|
-| `APP_HOST` | `0.0.0.0` | FastAPI 服務 host |
-| `APP_PORT` | `8000` | FastAPI 服務 port |
-| `MODEL_VERSION` | `v1.0` | YOLO 權重版本，對應 `model/<版本>/best.pt` |
-| `MODEL_WEIGHT_NAME` | `best.pt` | 權重檔名 |
-| `DEVICE` | `cpu` | 推論裝置（固定 cpu，不支援 GPU）|
-| `POSTGRES_HOST` | `db` | DB host（docker compose 內用服務名）|
-| `POSTGRES_PORT` | `5432` | 容器內部 port |
-| `POSTGRES_DB` | `invoice` | 資料庫名稱 |
-| `POSTGRES_USER` | `postgres` | 資料庫帳號 |
-| `POSTGRES_PASSWORD` | `postgres` | 資料庫密碼 |
-| `POSTGRES_EXTERNAL_PORT` | `5432` | 對外曝露的 DB port（host 端存取用）|
+| `APP_PORT` | FastAPI 對外服務 port | `8000` |
+| `MODEL_VERSION` | YOLO 權重版本，對應路徑 `model/<version>/` | `v1.0` |
+| `MODEL_WEIGHT_NAME` | YOLO 權重檔名 | `best.pt` |
+| `YOLO_CONF` | YOLO 偵測信心值門檻 | `0.25` |
+| `YOLO_IMGSZ` | YOLO 推論圖片尺寸 | `960` |
+| `POSTGRES_DB` | PostgreSQL 資料庫名稱 | `invoice` |
+| `POSTGRES_USER` | PostgreSQL 帳號 | `postgres` |
+| `POSTGRES_PASSWORD` | PostgreSQL 密碼 | *(請自行設定)* |
+| `POSTGRES_EXTERNAL_PORT` | PostgreSQL 對外曝露 port（host 端存取） | `5432` |
+| `BATCH_INPUT_DIR` | Go batch 掃描的 host 端圖片目錄 | `./test_samples` |
+| `BATCH_WORKERS` | Go batch 並行 worker 數 | `2` |
 
 ---
 
-## API 使用說明
+## API 說明
 
-### 健康檢查
+### `GET /health`
 
-```bash
-curl http://localhost:8000/health
-```
+服務健康檢查，Docker compose healthcheck 使用。
 
-回傳：
 ```json
-{"status": "ok"}
+{ "status": "ok" }
 ```
 
-### 發票 OCR + 對獎
+---
 
-```bash
-curl -X POST http://localhost:8000/analyze \
-  -F "file=@IMG_0001.jpg"
-```
+### `POST /analyze`
 
-**回傳範例（未中獎）：**
+上傳單張發票圖片，執行 YOLO + OCR 辨識並完成對獎，回傳 JSON 結果。
+
+- **輸入**：`multipart/form-data`，欄位名稱為 `file`，支援 `jpg` / `png`
+- **DB 寫入**：FastAPI 不寫入 DB；結果由 Go batch 服務負責寫入
+- **錯誤處理**：圖片無法讀取回傳 `HTTP 400`, OCR 辨識失敗以欄位 `null` 表達，不回傳 `500`
+
+**回傳 JSON 範例（未中獎）：**
 
 ```json
 {
   "success": true,
+  "request_id": "550e8400-e29b-41d4-a716-446655440000",
   "data": {
     "image_name": "IMG_0001.jpg",
     "model_version": "v1.0",
     "invoice": {
       "invoice_number": "AB-12345678",
       "invoice_date": "2026-01-15",
-      "invoice_time": "13:45:22",
+      "invoice_time": "13:45:00",
       "total_amount": 120,
-      "merchant_name": "全家便利商店"
+      "merchant_name": "範例商家"
     },
     "yolo_confidence": {
-      "invoice_number": 0.9821,
-      "invoice_date": 0.9543,
-      "invoice_time": 0.9312,
-      "total_amount": 0.9644,
+      "invoice_number": 0.96,
+      "invoice_date": 0.91,
+      "invoice_time": 0.88,
+      "total_amount": 0.94,
       "merchant_name": null
     },
     "award_result": {
@@ -140,115 +137,22 @@ curl -X POST http://localhost:8000/analyze \
 
 ---
 
-## 對獎規則說明
+## DB 說明
 
-依台灣財政部統一發票兌獎規則，各獎別比對位數：
+資料庫使用 PostgreSQL，共四張表，於容器首次啟動時透過 `init.sql` 自動建立與載入初始對獎號碼。
 
-| 獎別 | 比對方式 | 獎金 |
+| Table 名稱 | 儲存內容 | 主要用途 |
 |---|---|---|
-| 特別獎 | 後 8 碼完全相符 | 1,000 萬 |
-| 特獎 | 後 8 碼完全相符 | 200 萬 |
-| 頭獎 | 後 8 碼完全相符（3 組）| 20 萬 |
-| 二獎 | 後 7 碼符合任一頭獎組 | 4 萬 |
-| 三獎 | 後 6 碼符合任一頭獎組 | 1 萬 |
-| 四獎 | 後 5 碼符合任一頭獎組 | 4,000 |
-| 五獎 | 後 4 碼符合任一頭獎組 | 1,000 |
-| 六獎 | 後 3 碼符合任一頭獎組 | 200 |
-| 增開六獎 | 後 3 碼符合增開六獎號碼 | 200 |
+| `invoice_awards` | 台灣統一發票各期對獎號碼（特別獎、特獎、頭獎等） | 對獎比對基準資料 |
+| `invoice_inference_results` | OCR 辨識結果與對獎結果，含 `request_id` 追蹤 | 儲存每張發票的推論與中獎資訊 |
+| `invoice_inference_conf` | YOLO 各欄位偵測信心值（0~1） | 作為模型效能監控與潛在 Model Drift 的觀察依據 |
+| `invoice_batch_inference_logs` | Go batch 每張圖片的處理狀態、耗時與錯誤訊息 | 批次執行紀錄與失敗排查 |
+
+`request_id`（UUID）貫穿三張明細表，可跨表追蹤同一次推論的完整記錄。
 
 ---
 
-## 注意事項
+## Power BI 視覺化呈現 與 專案介紹投影片
 
-### init.sql 重新執行
-
-`init.sql` 只在 **db volume 為空（首次初始化）時** 執行。
-
-若修改了 `init.sql`（例如新增期別的對獎號碼），需先移除 volume 再重啟：
-
-```bash
-docker compose down -v
-docker compose up --build -d
-```
-
-> ⚠️ `down -v` 會刪除所有 volume 資料，包含已存在的對獎記錄。
-
-### 模型版本切換
-
-修改 `.env` 的 `MODEL_VERSION`（如 `v1.1`），放置對應權重 `model/v1.1/best.pt`，重啟服務即可：
-
-```bash
-docker compose restart api
-```
-
-回傳的 `model_version` 欄位會自動對應。
-
----
-
-## Go Batch 批次推論服務
-
-`go_batch/` 是 Go 語言實作的批次推論服務，負責掃描指定目錄中的圖片，呼叫 FastAPI `/analyze` 推論後，將結果寫入 PostgreSQL。
-
-### 服務職責分工
-
-| 服務 | 職責 |
-|---|---|
-| FastAPI (`api`) | 單張圖片推論、OCR、對獎判斷，回傳 JSON |
-| Go batch (`batch`) | 掃描資料夾、並行呼叫 FastAPI、寫入 DB |
-| PostgreSQL (`db`) | 保存推論結果、confidence、批次 log |
-
-### 使用方式
-
-```bash
-# 啟動 DB 與 FastAPI
-docker compose up --build -d db api
-
-# 執行一次 Go batch（處理完後容器自動結束）
-docker compose run --rm batch
-
-# 看 API log
-docker compose logs -f api
-
-# 查詢 batch 處理記錄
-docker compose exec db psql -U postgres -d invoice -c "SELECT * FROM invoice_batch_inference_logs ORDER BY id DESC LIMIT 20;"
-
-# 若 init.sql schema 有變更，需重建 DB volume
-docker compose down -v
-docker compose up --build -d db api
-```
-
-### Go Batch 環境變數
-
-| 變數 | 預設值 | 說明 |
-|---|---|---|
-| `BATCH_API_URL` | `http://api:8000` | FastAPI 服務 URL（容器內使用服務名） |
-| `BATCH_INPUT_DIR` | `./test_samples` | Host 端圖片目錄（掛載到容器） |
-| `CONTAINER_BATCH_INPUT_DIR` | `/data/test_samples` | 容器內的掛載路徑 |
-| `BATCH_WORKERS` | `2` | 並行 worker 數量 |
-
-### DB 寫入說明
-
-批次推論成功後，Go 服務會寫入三張表：
-
-1. `invoice_inference_results`：OCR 辨識結果與對獎結果
-2. `invoice_inference_conf`：各欄位 YOLO confidence
-3. `invoice_batch_inference_logs`：處理日誌（成功或失敗均記錄）
-
-失敗的圖片（API 錯誤、逾時、DB 寫入失敗等）只寫 `invoice_batch_inference_logs(status='failed')`，不影響其他圖片繼續執行。
-
----
-
-## 本機開發（不用 Docker）
-
-```bash
-# 安裝依賴
-uv pip install -e .
-
-# 設定環境變數（DB 指向本機 PostgreSQL）
-export POSTGRES_HOST=localhost
-export POSTGRES_PORT=5432
-# ... 其他變數
-
-# 啟動服務
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-```
+- [下載 Power BI 儀錶板](https://drive.google.com/file/d/1zpPUsnKZqYLohfRG4ZiC9lNWLI5LDrRf/view?usp=sharing)
+- [下載專案介紹投影片](https://drive.google.com/file/d/14-8PSAVZ4NjjNjscMVqV8MjI2ZvVyROe/view?usp=sharing)
