@@ -1,8 +1,8 @@
 # Taiwan Invoice AI System
 
-本專案是一個紙本台灣電子發票證明聯 AI 自動辨識與對獎分析系統。專案使用 YOLO11 偵測發票關鍵欄位，結合 OpenCV 前處理與 OCR 擷取文字，解析發票號碼、日期、金額與商家資訊，並自動完成對獎。系統透過 FastAPI 封裝推論服務，使用 Go Batch 進行併發批次推論，並將結果寫入 PostgreSQL，最後以 Power BI 進行視覺化分析。
+此專案是一個紙本台灣電子發票證明聯 AI 自動辨識與對獎分析系統。專案使用 YOLO11 偵測發票關鍵欄位，結合 OpenCV 前處理與 OCR 擷取文字，解析發票號碼、日期、金額與商家資訊，並自動完成對獎。系統透過 FastAPI 封裝推論服務，使用 Go Batch 進行併發批次推論，並將結果寫入 PostgreSQL，最後以 Power BI 進行視覺化分析。
 
-*本專案部分程式碼與 Claude Code 協作開發。*
+*專案部分程式碼與 Claude Code 協作開發。*
 
 ---
 
@@ -48,8 +48,7 @@ model/v1.0/best.pt
 
 ### 2. 建立 `.env`
 
-複製`.env.example`範本並依實際設定需求填入。
-
+請先複製 `.env.example` 作為 `.env` 設定檔，並依實際執行環境填入所需參數。
 
 ### 3. 啟動服務
 
@@ -97,7 +96,7 @@ docker compose run --rm batch
 上傳單張發票圖片，執行 YOLO + OCR 辨識並完成對獎，回傳 JSON 結果。
 
 - **輸入**：`multipart/form-data`，欄位名稱為 `file`，支援 `jpg` / `png`
-- **DB 寫入**：FastAPI 不寫入 DB；結果由 Go batch 服務負責寫入
+- **DB 寫入**：FastAPI 不寫入 DB，結果由 Go batch 服務負責寫入
 
 **回傳 JSON 範例（未中獎）：**
 
@@ -120,7 +119,7 @@ docker compose run --rm batch
       "invoice_date": 0.91,
       "invoice_time": 0.88,
       "total_amount": 0.94,
-      "merchant_name": null
+      "merchant_name": 0.83
     },
     "award_result": {
       "period": "115年01-02月",
@@ -146,11 +145,20 @@ docker compose run --rm batch
 | `invoice_inference_conf` | YOLO 各欄位偵測信心值（0~1） | 作為模型效能監控與潛在 Model Drift 的觀察依據 |
 | `invoice_batch_inference_logs` | Go batch 每張圖片的處理狀態、耗時與錯誤訊息 | 批次執行紀錄與失敗排查 |
 
-`request_id`（UUID）貫穿三張明細表，可跨表追蹤同一次推論的完整記錄。
+`request_id`（UUID）可跨表追蹤同一次推論的完整記錄。
 
 ---
 
-## Power BI 視覺化呈現 與 專案介紹投影片
+## Power BI 視覺化呈現
 
-- [下載 Power BI 儀錶板](https://drive.google.com/file/d/1zpPUsnKZqYLohfRG4ZiC9lNWLI5LDrRf/view?usp=sharing)
-- [下載專案介紹投影片](https://drive.google.com/file/d/14-8PSAVZ4NjjNjscMVqV8MjI2ZvVyROe/view?usp=sharing)
+本專案提供 Power BI 儀錶板，將發票辨識與對獎結果轉換為互動式視覺化分析，包含總消費金額、總中獎金額、中獎發票明細、每月消費趨勢與消費類別分布，並支援依期別、日期範圍與消費種類進行篩選。
+
+* [下載 Power BI 儀錶板](https://drive.google.com/file/d/1zpPUsnKZqYLohfRG4ZiC9lNWLI5LDrRf/view?usp=sharing)
+
+---
+
+## 專案介紹投影片
+
+本專案提供完整介紹投影片，內容包含專案背景、系統流程、YOLO 與 OCR 辨識方式、FastAPI + Go Batch 系統架構、工程化設計亮點，以及 Power BI 視覺化成果。
+
+* [下載專案介紹投影片](https://drive.google.com/file/d/14-8PSAVZ4NjjNjscMVqV8MjI2ZvVyROe/view?usp=sharing)
