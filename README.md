@@ -2,7 +2,9 @@
 
 此專案是一個紙本台灣電子發票證明聯 AI 自動辨識與對獎分析系統。專案使用 YOLO11 偵測發票關鍵欄位，結合 OpenCV 前處理與 OCR 擷取文字，解析發票號碼、日期、金額與商家資訊，並自動完成對獎。系統透過 FastAPI 封裝推論服務，使用 Go Batch 進行併發批次推論，並將結果寫入 PostgreSQL，最後以 Power BI 進行視覺化分析。
 
-*專案部分程式碼與 Claude Code 協作開發。*
+*註1：本專案部分程式碼與 Claude Code 協作開發。*  
+
+*註2：由於紙本發票版型與影像拍攝品質可能不同，目前 YOLO/OCR 辨識仍有機會出現誤差。系統保留信心值與推論紀錄，方便後續追蹤與改善。*
 
 ---
 
@@ -134,7 +136,7 @@ docker compose run --rm batch
 
 ---
 
-## DB 說明
+## Database 說明
 
 資料庫使用 PostgreSQL，共四張表，於容器首次啟動時透過 `init.sql` 自動建立與載入初始對獎號碼。
 
@@ -151,7 +153,7 @@ docker compose run --rm batch
 
 ## Power BI 視覺化呈現
 
-本專案提供 Power BI 儀錶板，將發票辨識與對獎結果轉換為互動式視覺化分析，包含總消費金額、總中獎金額、中獎發票明細、每月消費趨勢與消費類別分布，並支援依期別、日期範圍與消費種類進行篩選。
+專案提供 Power BI 儀錶板，將發票辨識與對獎結果轉換為互動式視覺化分析，包含總消費金額、總中獎金額、中獎發票明細、每月消費趨勢與消費類別分布，並支援依期別、日期範圍與消費種類進行篩選。
 
 * [下載 Power BI 儀錶板](https://drive.google.com/file/d/1zpPUsnKZqYLohfRG4ZiC9lNWLI5LDrRf/view?usp=sharing)
 
@@ -159,6 +161,6 @@ docker compose run --rm batch
 
 ## 專案介紹投影片
 
-本專案提供完整介紹投影片，內容包含專案背景、系統流程、YOLO 與 OCR 辨識方式、FastAPI + Go Batch 系統架構、工程化設計亮點，以及 Power BI 視覺化成果。
+專案提供完整介紹投影片，內容包含專案背景、系統流程、YOLO 與 OCR 辨識方式、FastAPI + Go Batch 系統架構、工程化設計亮點，以及 Power BI 視覺化成果。
 
 * [下載專案介紹投影片](https://drive.google.com/file/d/14-8PSAVZ4NjjNjscMVqV8MjI2ZvVyROe/view?usp=sharing)
