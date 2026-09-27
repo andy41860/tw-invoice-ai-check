@@ -176,7 +176,7 @@ func ScanImages(inputDir string) ([]string, error) {
 // API 呼叫
 // =========================================================
 
-// CallAnalyzeAPI 以 multipart/form-data 呼叫 FastAPI /analyze，回傳解析後的 ApiResponse 與耗時
+// CallAnalyzeAPI 以 multipart/form-data 呼叫 FastAPI /api/v1/analyze，回傳解析後的 ApiResponse 與耗時
 func CallAnalyzeAPI(apiURL, filePath, fileName string) (*ApiResponse, int64, error) {
 	f, err := os.Open(filePath)
 	if err != nil {
@@ -197,7 +197,7 @@ func CallAnalyzeAPI(apiURL, filePath, fileName string) (*ApiResponse, int64, err
 	writer.Close()
 
 	startTime := time.Now()
-	resp, err := http.Post(apiURL+"/analyze", writer.FormDataContentType(), &body)
+	resp, err := http.Post(apiURL+"/api/v1/analyze", writer.FormDataContentType(), &body)
 	inferenceMs := time.Since(startTime).Milliseconds()
 
 	if err != nil {

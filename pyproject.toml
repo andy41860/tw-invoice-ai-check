@@ -18,6 +18,8 @@ dependencies = [
     "psycopg-pool>=3.2.0",
     # YOLO 推論（batch_invoice_ocr.py 使用）
     "ultralytics>=8.2.0",
+    # OpenVINO 推論引擎（載入 OpenVINO 格式模型必要）
+    "openvino>=2024.0.0",
     # OCR（batch_invoice_ocr.py 使用）
     "easyocr>=1.7.0",
     # 影像處理（batch_invoice_ocr.py 使用，headless 避免 GUI 依賴）

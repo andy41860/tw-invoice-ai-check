@@ -1,0 +1,28 @@
+description: Ultralytics YOLO11s model trained on data.yaml
+author: Ultralytics
+date: '2026-09-26T14:56:39.586895'
+version: 8.4.53
+license: AGPL-3.0 License (https://ultralytics.com/license)
+docs: https://docs.ultralytics.com
+stride: 32
+task: detect
+batch: 1
+imgsz:
+- 960
+- 960
+names:
+  0: invoice_number
+  1: invoice_date
+  2: invoice_time
+  3: total_amount
+  4: merchant_name
+args:
+  data: null
+  batch: 1
+  fraction: 1.0
+  half: false
+  int8: false
+  dynamic: false
+  nms: false
+channels: 3
+end2end: false

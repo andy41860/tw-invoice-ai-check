@@ -20,8 +20,8 @@ services:
         # 等待 db 通過 healthcheck 後才啟動 api
         condition: service_healthy
     healthcheck:
-      # /health 在 lifespan 完成（含 warmup）後才會回應，確認模型已完全就緒
-      test: ["CMD-SHELL", "curl -f http://localhost:${APP_PORT:-8000}/health"]
+      # /api/v1/health 在 lifespan 完成（含 warmup）後才會回應，確認模型已完全就緒
+      test: ["CMD-SHELL", "curl -f http://localhost:${APP_PORT:-8000}/api/v1/health"]
       interval: 10s
       timeout: 5s
       retries: 5

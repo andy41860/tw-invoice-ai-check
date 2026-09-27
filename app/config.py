@@ -31,8 +31,8 @@ class Settings(BaseSettings):
     # ---- Model ----
     # 權重版本，組成路徑 model/<ModelVersion>/<ModelWeightName>
     ModelVersion: str = "v1.0"
-    # 權重檔名
-    ModelWeightName: str = "best.pt"
+    # OpenVINO 模型目錄名稱（目錄內含 .xml / .bin）
+    ModelWeightName: str = "best_openvino_model"
     # YOLO confidence threshold
     YoloConf: float = 0.25
     # YOLO 推論圖片尺寸
@@ -51,7 +51,7 @@ class Settings(BaseSettings):
     PostgresPassword: str = "postgres"
     @property
     def ModelWeightPath(self) -> Path:
-        """組合 YOLO 權重完整路徑：model/<ModelVersion>/<ModelWeightName>"""
+        """組合 OpenVINO 模型完整路徑：model/<ModelVersion>/<ModelWeightName>（目錄）"""
         return Path("model") / self.ModelVersion / self.ModelWeightName
 
     @property

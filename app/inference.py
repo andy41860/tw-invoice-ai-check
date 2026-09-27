@@ -44,8 +44,8 @@ def LoadModels(settings: Settings) -> Dict[str, Any]:
 
     if not weightPath.exists():
         raise FileNotFoundError(
-            f"找不到 YOLO 權重檔：{weightPath}，"
-            f"請確認 model/{settings.ModelVersion}/{settings.ModelWeightName} 已放置正確。"
+            f"找不到 YOLO OpenVINO 模型目錄：{weightPath}，"
+            f"請確認 model/{settings.ModelVersion}/{settings.ModelWeightName}/ 目錄已放置正確。"
         )
 
     print(f"[Inference] 載入 YOLO 模型：{weightPath}")

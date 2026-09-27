@@ -1,6 +1,6 @@
 # Taiwan Invoice AI System
 
-此專案是一個紙本台灣電子發票證明聯 AI 自動辨識與對獎分析系統。專案使用 YOLO11 偵測發票關鍵欄位，結合 OpenCV 前處理與 OCR 擷取文字，解析發票號碼、日期、金額與商家資訊，並自動完成對獎。系統透過 FastAPI 封裝推論服務，使用 Go Batch 進行併發批次推論，並將結果寫入 PostgreSQL，最後以 Power BI 進行視覺化分析。
+此專案是一個紙本台灣電子發票證明聯 AI 自動辨識與對獎分析系統。專案使用 YOLO11 偵測發票關鍵欄位，並將模型轉換為 OpenVINO 格式進行推論加速，結合 OpenCV 前處理與 OCR 擷取文字，解析發票號碼、日期、金額與商家資訊，並自動完成對獎。系統透過 FastAPI 封裝推論服務，使用 Go Batch 進行併發批次推論，並將結果寫入 PostgreSQL，最後以 Power BI 進行視覺化分析。
 
 *註1：本專案部分程式碼與 Claude Code 協作開發。*  
 
@@ -13,7 +13,7 @@
 ```text
 tw-invoice-ai-check/
 ├── app/                       # FastAPI 推論服務核心
-│   ├── main.py                # 路由定義與 lifespan 模型載入
+│   ├── main.py                # 路由定義（/api/v1）與 lifespan 模型載入
 │   ├── config.py              # 環境變數設定
 │   ├── inference.py           # YOLO + EasyOCR 推論邏輯
 │   ├── ocr.py                 # OCR 文字後處理
@@ -23,12 +23,16 @@ tw-invoice-ai-check/
 │   ├── dependencies.py        # FastAPI DI（模型、DB、設定注入）
 │   └── utils.py               # 工具函數（日期、金額解析等）
 ├── go_batch/                  # Go 批次推論程式（非常駐，跑完即結束）
-│   ├── main.go                # 掃描圖片 → 呼叫 API → 寫入 PostgreSQL
+│   ├── main.go                # 掃描圖片 → 呼叫 API /api/v1/analyze → 寫入 PostgreSQL
 │   ├── go.mod                 # Go module 定義
 │   └── Dockerfile             # Go 容器建置
-├── model/                     # YOLO 權重目錄（不進 git）
+├── model/                     # YOLO 模型目錄
 │   └── v1.0/
-│       └── best.pt            # YOLO11 訓練權重
+│       ├── best.pt                    # YOLO11 原始訓練權重（PyTorch 格式）
+│       └── best_openvino_model/       # OpenVINO 格式模型（推論使用）
+│           ├── best.xml               # OpenVINO IR 模型結構
+│           ├── best.bin               # OpenVINO IR 模型權重
+│           └── metadata.yaml          # 模型 metadata
 ├── test_samples/              # 測試用發票圖片
 ├── docker-compose.yml         # 容器服務設定（api / db / batch）
 ├── init.sql                   # PostgreSQL 初始化腳本（建表 + 載入對獎號碼）
@@ -40,13 +44,18 @@ tw-invoice-ai-check/
 
 ## 使用方式
 
-### 1. 放置 YOLO 權重
+### 1. 放置 OpenVINO 模型
 
-將訓練好的權重檔放至：
+將 OpenVINO 格式模型目錄放至：
 
 ```
-model/v1.0/best.pt
+model/v1.0/best_openvino_model/
+├── best.xml
+├── best.bin
+└── metadata.yaml
 ```
+
+> 從 `.pt` 轉換，使用 Ultralytics 指令：`yolo export model=best.pt format=openvino`
 
 ### 2. 建立 `.env`
 
@@ -69,8 +78,8 @@ docker compose run --rm batch
 | 變數名稱 | 用途 | 預設值 |
 |---|---|---|
 | `APP_PORT` | FastAPI 對外服務 port | `8000` |
-| `MODEL_VERSION` | YOLO 權重版本，對應路徑 `model/<version>/` | `v1.0` |
-| `MODEL_WEIGHT_NAME` | YOLO 權重檔名 | `best.pt` |
+| `MODEL_VERSION` | 模型版本，對應路徑 `model/<version>/` | `v1.0` |
+| `MODEL_WEIGHT_NAME` | OpenVINO 模型目錄名稱 | `best_openvino_model` |
 | `YOLO_CONF` | YOLO 偵測信心值門檻 | `0.5` |
 | `POSTGRES_DB` | PostgreSQL 資料庫名稱 | `invoice` |
 | `POSTGRES_USER` | PostgreSQL 帳號 | `postgres` |
@@ -83,7 +92,9 @@ docker compose run --rm batch
 
 ## API 說明
 
-### `GET /health`
+所有端點統一使用 `/api/v1` 前綴。
+
+### `GET /api/v1/health`
 
 服務健康檢查，Docker compose healthcheck 使用。
 
@@ -93,7 +104,7 @@ docker compose run --rm batch
 
 ---
 
-### `POST /analyze`
+### `POST /api/v1/analyze`
 
 上傳單張發票圖片，執行 YOLO + OCR 辨識並完成對獎，回傳 JSON 結果。
 
@@ -163,4 +174,4 @@ docker compose run --rm batch
 
 專案提供完整介紹投影片，內容包含專案背景、系統流程、YOLO 與 OCR 辨識方式、FastAPI + Go Batch 系統架構、工程化設計亮點，以及 Power BI 視覺化成果。
 
-* [下載專案介紹投影片](https://drive.google.com/file/d/14-8PSAVZ4NjjNjscMVqV8MjI2ZvVyROe/view?usp=sharing)
+* [下載專案介紹投影片](https://drive.google.com/file/d/1xHL5mPZJ_euM6wD1A0qSoGB3pchyl75Q/view?usp=sharing)

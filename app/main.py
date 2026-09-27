@@ -2,12 +2,12 @@
 """
 FastAPI 主程式：lifespan 管理模型載入、路由定義。
 
-路由：
-- GET  /health   → 健康檢查
-- POST /analyze  → 上傳 jpg → YOLO+OCR → 對獎 → 回傳 JSON
+路由（前綴 /api/v1）：
+- GET  /api/v1/health   → 健康檢查
+- POST /api/v1/analyze  → 上傳 jpg → YOLO+OCR → 對獎 → 回傳 JSON
 
 重要：
-- /analyze 使用同步 def（非 async），讓 FastAPI 丟到 threadpool 執行，
+- /api/v1/analyze 使用同步 def（非 async），讓 FastAPI 丟到 threadpool 執行，
   避免 CPU 密集的 YOLO/EasyOCR 推論卡住 event loop。
 - 模型只在 lifespan 啟動載入一次，透過 Depends(get_models) 注入。
 """
@@ -19,7 +19,7 @@ from typing import Any, Dict
 import numpy as np
 
 import psycopg
-from fastapi import Depends, FastAPI, File, UploadFile, status
+from fastapi import APIRouter, Depends, FastAPI, File, UploadFile, status
 from fastapi.responses import JSONResponse
 
 from app.config import GetSettings, Settings
@@ -89,8 +89,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# 所有路由統一掛載於 /api/v1 前綴
+router = APIRouter(prefix="/api/v1")
 
-@app.get("/health", summary="健康檢查", tags=["系統"])
+
+@router.get("/health", summary="健康檢查", tags=["系統"])
 def HealthCheck():
     """
     服務健康檢查端點。
@@ -99,7 +102,7 @@ def HealthCheck():
     return {"status": "ok"}
 
 
-@app.post(
+@router.post(
     "/analyze",
     response_model=InvoiceAnalyzeResponse,
     summary="發票 OCR + 對獎",
@@ -217,3 +220,6 @@ def AnalyzeInvoice(
         request_id=requestId,
         data=analyzeData,
     )
+
+
+app.include_router(router)
